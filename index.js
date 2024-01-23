@@ -65,6 +65,8 @@ for (const [key, val] of Object.entries(warAdjacencyList)) {
     }
 }
 
+var selected = -1
+
 var radius, strokeWidth
 
 adjacencyList = []
@@ -79,6 +81,9 @@ for (const name of alphabeticNames) {
     adjacencyList.push(m)
 }
 
+function log(message) {
+    document.getElementById('log').innerHTML+=message+'<br>'
+}
 
 function setAttributes(element, obj) {
     for (const [key, value] of Object.entries(obj)) {
@@ -86,33 +91,88 @@ function setAttributes(element, obj) {
     }
 }
 
+function randint(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function shuffle(array) {
+    let currentIndex = array.length,  randomIndex;
+  
+    // While there remain elements to shuffle.
+    while (currentIndex > 0) {
+  
+      // Pick a remaining element.
+      randomIndex = Math.floor(Math.random() * currentIndex);
+      currentIndex--;
+  
+      // And swap it with the current element.
+      [array[currentIndex], array[randomIndex]] = [
+        array[randomIndex], array[currentIndex]];
+    }
+  
+    return array;
+  }
+
+
 class Country {
     constructor(obj) {
         this.x = 5 * (Math.random() - .5)
         this.y = 5 * (Math.random() - .5)
         this.name = obj.name
         this.continent = obj.continent
+        this.troops = 1
     }
-}
+    setPlayer(player) {
+        this.player = player
+    }
+}  
+
 
 class Game {
     constructor(names, adjacencyList) {
+
+        this.players = 2
+        this.turn = 0
+
         this.adjacencyList = adjacencyList
         this.countriesNames = names
         this.countries = []
+        for (const name of this.countriesNames) this.countries.push(new Country({ 'name': name, 'continent': continents[name]}))
+        
+        //Escolhendo países para os jogadores
+        const x = Array(names.length).fill(0).map((el, index)=>index)
+        for (let i=0; i<names.length; i++){
+            this.countries[x.pop()].setPlayer(i%this.players)
+        }
+        
     }
-    draw() {
+    invade(originCountry, targetCountry) {
+        log(`O país ${this.countriesNames[originCountry]} vai invadir o país ${this.countriesNames[targetCountry]}`)
+        console.log()
+        console.log()
+        const atkDices = Array(this.countries[originCountry].troops).fill(0).map(()=>randint(1,6)).sort((a,b)=>(b-a))
+        const defDices = Array(this.countries[targetCountry].troops).fill(0).map(()=>randint(1,6)).sort((a,b)=>(b-a))
+        log(atkDices+'; '+defDices)
+        for (let i =0; i<atkDices.length; i++) {
+            log(''+(atkDices[i]>defDices[i]))
+        }
+
+
+    }
+    drawSvg(svg, countries, adjacencyList) {
+        
         function drawCircle(element, x, y, options = {}) {
             const circle = element.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'circle'))
             setAttributes(circle, {
                 'cx': x,
                 'cy': y,
                 'r': radius,
-                'fill': 'none',
-                'stroke-width': strokeWidth,
+                'fill': 'transparent',
+                'stroke-width': strokeWidth*1.5,
                 'stroke': 'lightgreen'
             })
             setAttributes(circle, options)
+            return circle
         }
         function drawText(element, x, y, content, options = {}) {
             const text = element.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'text'))
@@ -120,9 +180,9 @@ class Game {
                 'x': x,
                 'y': y,
                 'text-anchor': 'middle',
-                'fill': 'white',
+                'fill': 'black',
                 'alignment-baseline': 'middle',
-                'font-size': strokeWidth * 16,
+                'font-size': radius/2,
                 'font-family': 'Arial, Helvetica, sans-serif'
 
             })
@@ -144,54 +204,77 @@ class Game {
             })
             setAttributes(line, options)
         }
-        function drawSvg(svg, countries, adjacencyList) {
-            svg.innerHTML = ''
-            var xmin = 100000000
-            var xmax = -100000000
-            var ymin = 100000000
-            var ymax = -100000000
+        
+        svg.innerHTML = ''
+        var xmin = 100000000
+        var xmax = -100000000
+        var ymin = 100000000
+        var ymax = -100000000
 
 
-            for (const country of countries) {
-                if (country.x < xmin) xmin = country.x
-                if (country.y < ymin) ymin = country.y
-                if (country.x > xmax) xmax = country.x
-                if (country.y > ymax) ymax = country.y
+        for (const country of countries) {
+            if (country.x < xmin) xmin = country.x
+            if (country.y < ymin) ymin = country.y
+            if (country.x > xmax) xmax = country.x
+            if (country.y > ymax) ymax = country.y
+        }
+
+        strokeWidth = ((xmax - xmin) * (ymax - ymin)) ** .5 / 600 * 1.2
+        radius = ((xmax - xmin) * (ymax - ymin)) ** .5  /25
+
+        setAttributes(svg,
+            {
+                'width': '50%',
+                'height': document.body.clientHeight,
+                'viewBox': `${xmin - radius} ${ymin - radius} ${xmax - xmin + 2*radius} ${ymax - ymin + 2*radius}`
             }
+        )
 
-            strokeWidth = ((xmax - xmin) * (ymax - ymin)) ** .5 / 600
-            radius = ((xmax - xmin) * (ymax - ymin)) ** .5  /25
-
-            setAttributes(svg,
-                {
-                    'width': '100%',
-                    'height': '100%',
-                    'viewBox': `${xmin - radius} ${ymin - radius} ${xmax - xmin + radius} ${ymax - ymin + radius}`
-                }
-            )
-            svg.style.backgroundColor = 'black'
-
-
-            for (let i = 0; i < countries.length; i++) {
-                for (const j of adjacencyList[i]) {
-                    drawLine(svg, countries[i].x, countries[i].y,
-                        countries[j].x, countries[j].y)
-                }
-            }
-            for (const country of countries) {
-                drawCircle(svg, country.x, country.y, { 'stroke': `hsl(${60 * continents[country['name']]},50%,50%)` })
-                drawText(svg, country.x, country.y, country.name)
+        for (let i = 0; i < countries.length; i++) {
+            for (const j of adjacencyList[i]) {
+                drawLine(svg, countries[i].x, countries[i].y,
+                    countries[j].x, countries[j].y)
             }
         }
-        const svg = document.body.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'svg'))
+        for (let i = 0; i<countries.length; i++) {
+            const country = countries[i]
+            drawText(svg, country.x, country.y-radius/3, country.name)
+            drawCircle(svg, country.x, country.y+radius/2, { 'stroke': 'black', 'r': radius/2, 'fill': `hsl(${180 * country['player']},50%,80%)`}) 
+            drawText(svg, country.x, country.y+radius/2, country['troops'])
+            const circle = drawCircle(svg, country.x, country.y, { 'stroke': `hsl(${80 + 60 * continents[country['name']]},50%,50%)` })
+            circle.onclick = () => {
+                if (selected == -1) {
+                    selected = i
+                } else {
+                    this.invade(selected, i)
+                    selected = -1
+                }
+                this.drawSvg(svg, countries, adjacencyList)                    
+            }
+            if (selected == i) {                    
+                circle.setAttribute('stroke', 'black')
+                circle.setAttribute('fill',`hsl(${80 + 60 * continents[country['name']]},50%,50%)`)
+                drawText(svg, country.x, country.y-radius/3, country.name)
+                drawCircle(svg, country.x, country.y+radius/2, { 'stroke': 'black', 'r': radius/2, 'fill': `hsl(${180 * country['player']},50%,80%)`}) 
+                drawText(svg, country.x, country.y+radius/2, country['troops'])
+            }
             
-        for (const name of this.countriesNames) this.countries.push(new Country({ 'name': name, 'continent': continents[name]}))
+        }
+    }
+    draw() {
+        const root = document.body.appendChild(document.createElement('div'))
+        root.style.display = 'flex'
+        const svg = root.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'svg'))
+            
+        
         var c1 = .02 //Hooke's Law
         var c2 = .1 //Repulsion
         var c3 = .01 //Attracts towards center
         const comprimento = 1
-        setInterval(() => {            
-            drawSvg(svg, this.countries, this.adjacencyList)
+        // setInterval(() => {   
+        for(let it = 0; it < 10000; it++) {  
+            if (it == 10000-1)
+            this.drawSvg(svg, this.countries, this.adjacencyList)
             for (let i = 0; i < this.countries.length; i++) {
                 const center = { 'x': 0, 'y': 0 }
                 const dCenter = ((center.x - this.countries[i].x) ** 2 + (center.y - this.countries[i].y) ** 2) ** .5
@@ -215,20 +298,22 @@ class Game {
                     this.countries[i].y += Fy
                 }
             }
-        },10)
+        }
+        // },100)
+
+        const game = root.appendChild(document.createElement('div'))
+        const menuTitle = game.appendChild(document.createElement('div'))
+        const log = game.appendChild(document.createElement('div'))
+        log.id = 'log'
+        log.style.height = '40%'
+        log.style.overflow = 'auto'
+        menuTitle.innerHTML = '<h1>WAR</h1>'
+        game.style.width = '50%'
+        game.style.backgroundColor = 'black'
+        game.style.textAlign = 'center'
+        game.style.color = 'white'
     }
 }
 
-button = document.body.appendChild(document.createElement('button'))
-button.innerHTML = 'start'
-button.style.position = 'absolute'
-button.style.left = '50%'
-button.style.top = '50%'
-button.style.transform = 'translate(-50%,-50%)'
-button.style.height = 100
-button.style.width = 100
-button.onclick = () => {
-    const game = new Game(alphabeticNames, adjacencyList)
-    game.draw()
-    button.remove()
-}
+const game = new Game(alphabeticNames, adjacencyList)
+game.draw()
