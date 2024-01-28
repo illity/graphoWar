@@ -43,6 +43,7 @@ warAdjacencyList = {
     'Austrália': ['Sumatra', 'Bornéu', 'Nova Guiné']
 }
 
+var selected = -1
 div = [4, 9, 7, 6, 12, 4]
 continents = {}
 let i = 0, j = 0
@@ -65,9 +66,7 @@ for (const [key, val] of Object.entries(warAdjacencyList)) {
     }
 }
 
-var selected = -1
-
-var radius, strokeWidth
+var radius, strokeWidth, fontSize
 
 adjacencyList = []
 const alphabeticNames = Object.keys(warAdjacencyList).sort()
@@ -81,8 +80,9 @@ for (const name of alphabeticNames) {
     adjacencyList.push(m)
 }
 
+
 function log(message) {
-    document.getElementById('log').innerHTML+=message+'<br>'
+    document.getElementById('log').innerHTML += message; 0
 }
 
 function setAttributes(element, obj) {
@@ -91,28 +91,7 @@ function setAttributes(element, obj) {
     }
 }
 
-function randint(min, max) {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-function shuffle(array) {
-    let currentIndex = array.length,  randomIndex;
-  
-    // While there remain elements to shuffle.
-    while (currentIndex > 0) {
-  
-      // Pick a remaining element.
-      randomIndex = Math.floor(Math.random() * currentIndex);
-      currentIndex--;
-  
-      // And swap it with the current element.
-      [array[currentIndex], array[randomIndex]] = [
-        array[randomIndex], array[currentIndex]];
-    }
-  
-    return array;
-  }
-
+randint = (min, max) => (Math.floor(Math.random() * (max - min + 1) + min))
 
 class Country {
     constructor(obj) {
@@ -123,75 +102,84 @@ class Country {
         this.troops = 1
     }
     setPlayer(player) {
-        this.player = player
+        this.player = player;
     }
-}  
-
+}
 
 class Game {
     constructor(names, adjacencyList) {
-
-        this.players = 2
+        this.players = [
+            {'troops': 0},
+            {'troops': 0},
+        ]
         this.turn = 0
+        this.selected = []
 
         this.adjacencyList = adjacencyList
         this.countriesNames = names
         this.countries = []
-        for (const name of this.countriesNames) this.countries.push(new Country({ 'name': name, 'continent': continents[name]}))
-        
-        //Escolhendo países para os jogadores
-        const x = Array(names.length).fill(0).map((el, index)=>index)
-        for (let i=0; i<names.length; i++){
-            this.countries[x.pop()].setPlayer(i%this.players)
+        for (const name of this.countriesNames) this.countries.push(new Country({ 'name': name, 'continent': continents[name] }))
+        const x = Array(names.length).fill(0).map((el, index) => index)
+        for (let i = 0; i < names.length; i++) {
+            this.countries[x.pop()].setPlayer(i % this.players.length);
         }
-        
     }
     invade(originCountry, targetCountry) {
-        log(`O país ${this.countriesNames[originCountry]} vai invadir o país ${this.countriesNames[targetCountry]}`)
-        console.log()
-        console.log()
-        const atkDices = Array(this.countries[originCountry].troops).fill(0).map(()=>randint(1,6)).sort((a,b)=>(b-a))
-        const defDices = Array(this.countries[targetCountry].troops).fill(0).map(()=>randint(1,6)).sort((a,b)=>(b-a))
-        log(atkDices+'; '+defDices)
-        for (let i =0; i<atkDices.length; i++) {
-            log(''+(atkDices[i]>defDices[i]))
+        if (!this.adjacencyList[originCountry].includes(targetCountry)) return -1;
+
+        log(`O país ${this.countriesNames[originCountry]} vai invadir o país ${this.countriesNames[targetCountry]}<br>`)
+        const atkDices = Array(Math.min(this.countries[originCountry].troops-1,3)).fill(0).map(() => randint(1, 6)).sort((a, b) => (b - a))
+        const defDices = Array(Math.min(this.countries[targetCountry].troops  ,3)).fill(0).map(() => randint(1, 6)).sort((a, b) => (b - a))
+        log(`(${atkDices}) x (${defDices}) `)
+        for (let i = 0; i < Math.min(atkDices.length, defDices.length); i++) {
+            log((atkDices[i] > defDices[i]) ? 'Vitória ' : 'Derrota ')
+            this.countries[originCountry].troops -= (atkDices[i] <= defDices[i])
+            this.countries[targetCountry].troops -= (atkDices[i] > defDices[i])
         }
-
-
+        if (!this.countries[targetCountry].troops) {
+            log('Território conquistado!')
+            this.countries[targetCountry].troops++;
+            this.countries[originCountry].troops--;
+            this.countries[targetCountry].player = this.countries[originCountry].player            
+        }
+        log('<br>')
+        return false;
     }
     drawSvg(svg, countries, adjacencyList) {
-        
         function drawCircle(element, x, y, options = {}) {
-            const circle = element.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'circle'))
+            const circle = (element.tagName == 'circle') ? element : element.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'circle'))
             setAttributes(circle, {
                 'cx': x,
                 'cy': y,
                 'r': radius,
                 'fill': 'transparent',
-                'stroke-width': strokeWidth*1.5,
+                'stroke-width': strokeWidth,
                 'stroke': 'lightgreen'
             })
             setAttributes(circle, options)
             return circle
         }
         function drawText(element, x, y, content, options = {}) {
-            const text = element.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'text'))
+            const text = (element.tagName == 'text') ? element : element.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'text'))
             setAttributes(text, {
                 'x': x,
                 'y': y,
                 'text-anchor': 'middle',
-                'fill': 'black',
                 'alignment-baseline': 'middle',
-                'font-size': radius/2,
+                'font-size': fontSize,
                 'font-family': 'Arial, Helvetica, sans-serif'
 
             })
             text.innerHTML = content
+            element.onselectstart = () => false;
+            text.style.MozUserSelect = 'none'
+            text.onmousedown = () => false;
             setAttributes(text, options)
+            return text
 
         }
         function drawLine(element, x1, y1, x2, y2, options = {}) {
-            const line = element.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'line'))
+            const line = (element.tagName == 'line') ? element : element.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'line'))
             const d = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** .5
             setAttributes(line, {
                 'x1': x1 + (x2 - x1) * radius / d,
@@ -203,9 +191,8 @@ class Game {
                 'stroke': 'rgba(100,100,100,1)'
             })
             setAttributes(line, options)
+            return line
         }
-        
-        svg.innerHTML = ''
         var xmin = 100000000
         var xmax = -100000000
         var ymin = 100000000
@@ -219,62 +206,168 @@ class Game {
             if (country.y > ymax) ymax = country.y
         }
 
-        strokeWidth = ((xmax - xmin) * (ymax - ymin)) ** .5 / 600 * 1.2
-        radius = ((xmax - xmin) * (ymax - ymin)) ** .5  /25
+        strokeWidth = ((xmax - xmin) * (ymax - ymin)) ** .5 / 300
+        fontSize = ((xmax - xmin) * (ymax - ymin)) ** .5 / 50
+        radius = ((xmax - xmin) * (ymax - ymin)) ** .5 / 25
+
+
 
         setAttributes(svg,
             {
                 'width': '50%',
                 'height': document.body.clientHeight,
-                'viewBox': `${xmin - radius} ${ymin - radius} ${xmax - xmin + 2*radius} ${ymax - ymin + 2*radius}`
+                'viewBox': `${xmin - radius} ${ymin - radius} ${xmax - xmin + 2 * radius} ${ymax - ymin + 2 * radius}`
             }
         )
-
         for (let i = 0; i < countries.length; i++) {
             for (const j of adjacencyList[i]) {
-                drawLine(svg, countries[i].x, countries[i].y,
-                    countries[j].x, countries[j].y)
+                if (!adjacencyList[i].lines) adjacencyList[i].lines = []
+                adjacencyList[i].lines[j] = drawLine(adjacencyList[i].lines[j] ? adjacencyList[i].lines[j] : svg, countries[i].x, countries[i].y, countries[j].x, countries[j].y)
             }
         }
-        for (let i = 0; i<countries.length; i++) {
-            const country = countries[i]
-            drawText(svg, country.x, country.y-radius/3, country.name)
-            drawCircle(svg, country.x, country.y+radius/2, { 'stroke': 'black', 'r': radius/2, 'fill': `hsl(${180 * country['player']},50%,80%)`}) 
-            drawText(svg, country.x, country.y+radius/2, country['troops'])
-            const circle = drawCircle(svg, country.x, country.y, { 'stroke': `hsl(${80 + 60 * continents[country['name']]},50%,50%)` })
-            circle.onclick = () => {
-                if (selected == -1) {
-                    selected = i
-                } else {
-                    this.invade(selected, i)
-                    selected = -1
+        for (let i = 0; i < countries.length; i++) {
+            const country = countries[i];
+            country.text = drawText(country.text ? country.text : svg, country.x, country.y - radius / 3, country.name)
+            country.troopCircle = drawCircle(country.troopCircle ? country.troopCircle : svg, country.x, country.y + radius / 2,
+                { 'stroke': 'black', 'r': radius / 2, 'fill': `hsl(${360 / this.players.length * country['player']}, 50%, 80%)` })
+            country.troopText = drawText(country.troopText ? country.troopText : svg, country.x, country.y + 2 * radius / 3, country['troops'])
+            country.circle = drawCircle(country.circle ? country.circle : svg, country.x, country.y,
+                { 'stroke': `hsl(${80 + 60 * continents[country['name']]}, 50%, 80%)` })
+            country.circle.style.cursor = 'pointer'
+            country.circle.onclick = (ev) => {
+                this.selected.push(i)
+                this.drawSvg(svg, countries, adjacencyList)
+            }
+            country.circle.oncontextmenu = (ev) => {
+                ev.preventDefault();
+                console.log(this.selected.indexOf(i))
+                const index = this.selected.indexOf(i)
+                if (index !== -1) {
+                    this.selected.splice(index, 1);
                 }
-                this.drawSvg(svg, countries, adjacencyList)                    
+                this.drawSvg(svg, countries, adjacencyList)
             }
-            if (selected == i) {                    
-                circle.setAttribute('stroke', 'black')
-                circle.setAttribute('fill',`hsl(${80 + 60 * continents[country['name']]},50%,50%)`)
-                drawText(svg, country.x, country.y-radius/3, country.name)
-                drawCircle(svg, country.x, country.y+radius/2, { 'stroke': 'black', 'r': radius/2, 'fill': `hsl(${180 * country['player']},50%,80%)`}) 
-                drawText(svg, country.x, country.y+radius/2, country['troops'])
+            if (this.selected.includes(i)) {
+                var count = 0
+                for (let j = 0; j < this.selected.length; j++) {
+                    if (this.selected[j] == i) count+=1
+                }
+                if (count>1) country.troopText.innerHTML = country.troops +'+'+ count
+                country.circle.setAttribute('stroke', 'black')
+                country.circle.setAttribute('fill', `hsla(${80 + 60 * continents[country['name']]}, 50%, 80%, 0.3)`)
             }
-            
         }
     }
-    draw() {
+
+    prepareAction() {
+        if (!(this.turn%4)) {
+            // No início de cada turno completo, calcula as tropas dos jogadores
+            log('Calculando as tropas de cada jogador...<br>')
+            this.countries.forEach(country=>{this.players[country.player].troops += 1/2})
+            this.players.forEach((player,index)=>{
+                player.troops = ~~player.troops
+                log(`O jogador ${index} tem ${player.troops} tropas`)
+                if (index<this.players.length-1) log(', ')
+                else log('<br><br>')
+            })
+    
+        }
+        const actionBody = document.getElementById('actions')
+        const actions = [`Alocar Tropas - Escolha em que país você deseja alocar suas tropas<br>Você possui ${this.players[this.turn%2].troops} tropas`,
+                         'Atacar - Escolha que países deseja invadir']
+        actionBody.innerHTML = `Vez do jogador ${(this.turn%4)>>1} - `
+        actionBody.innerHTML += actions[this.turn%2] + '<br>'
+        const button = actionBody.appendChild(document.createElement('button'))
+        button.innerHTML = 'Pronto!'
+        button.onclick = (ev)=>{
+            ev.preventDefault();
+            this.action()
+        }
+    }
+
+    action() {
+        //Fase de alocar tropas
+        const nPlayer = ~~(this.turn%4/2)
+        const player = this.players[nPlayer]
+        if (this.turn%2 == 0) {
+            if (this.selected.length <= player.troops) {
+                for (i of this.selected) {
+                    if (!(this.countries[i].player == nPlayer)) return;
+                }
+                log('Acrescida 1 tropa nos territórios: ')
+                for (let i = 0; i < this.selected.length; i++) {
+                    log(`${this.countries[this.selected[i]].name}${i<this.selected.length-1?", ":""}`)
+                    this.countries[this.selected[i]].troops += 1
+                }
+                player.troops -= this.selected.length;
+                log(`<br>Restam ${player.troops} tropas para o jogador ${nPlayer}<br>`)
+                this.selected = [];
+                this.turn++;
+            } else {
+                console.log('inválido!')
+            }
+        }
+        else if (this.turn%2 == 1) {
+            if (this.selected.length == 0) {
+                log('Turno encerrado!<br><br>')
+                this.turn++;
+            }
+            if (this.selected.length == 2) {
+                if (this.countries[this.selected[0]].player != nPlayer) return;
+                if (this.countries[this.selected[1]].player == nPlayer) return;
+
+                if (!this.invade(this.selected[0], this.selected[1])) {
+                    this.selected = [];
+                }
+            }
+        }
+        this.prepareAction();
+    }
+    firstDraw() {
         const root = document.body.appendChild(document.createElement('div'))
         root.style.display = 'flex'
         const svg = root.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'svg'))
-            
-        
+        svg.id = 'svgGame'
+        this.drawSvg(svg, this.countries, this.adjacencyList)
+
+        const game = root.appendChild(document.createElement('div'))
+        const menuTitle = game.appendChild(document.createElement('div'))
+        const log = game.appendChild(document.createElement('div'))
+        game.style.backgroundColor = 'black'
+        game.style.color = 'white'
+        game.style.textAlign = 'center'
+        log.id = 'log'
+        log.style.height = '40%'
+        log.style.overflow = 'auto'
+        const actions = game.appendChild(document.createElement('div'))
+        actions.appendChild(document.createElement('div')).innerHTML = '<h4>Actions</h4>'
+        const actionsBody = actions.appendChild(document.createElement('div'))
+        actionsBody.id = 'actions'
+        actionsBody.innerHTML = 'Escolha como alocar suas tropas'
+        actions.style.border = '2px solid white'
+        actions.style.margin = '32px'
+        actions.style.height = '30%'
+        menuTitle.innerHTML = '<h1>WAR</h1>'
+        game.style.width = '50%'
+
+    }
+    draw() {
+        var svg = document.getElementById('svgGame')
+        if (!svg) {
+            this.firstDraw()
+            this.draw()
+            svg = document.getElementById('svgGame')
+            return
+        }
+        this.prepareAction()
+        //com 2 jogadores ->
+
         var c1 = .02 //Hooke's Law
         var c2 = .1 //Repulsion
         var c3 = .01 //Attracts towards center
         const comprimento = 1
-        // setInterval(() => {   
-        for(let it = 0; it < 10000; it++) {  
-            if (it == 10000-1)
-            this.drawSvg(svg, this.countries, this.adjacencyList)
+
+        setInterval(() => {
             for (let i = 0; i < this.countries.length; i++) {
                 const center = { 'x': 0, 'y': 0 }
                 const dCenter = ((center.x - this.countries[i].x) ** 2 + (center.y - this.countries[i].y) ** 2) ** .5
@@ -290,7 +383,7 @@ class Game {
             }
             for (let i = 0; i < this.countries.length; i++) {
                 for (let j = 0; j < this.countries.length; j++) {
-                    if (i==j) continue
+                    if (i == j) continue
                     const d = ((this.countries[j].x - this.countries[i].x) ** 2 + (this.countries[j].y - this.countries[i].y) ** 2)
                     const Fx = - c2 / d * (this.countries[j].x - this.countries[i].x)
                     const Fy = - c2 / d * (this.countries[j].y - this.countries[i].y)
@@ -298,22 +391,11 @@ class Game {
                     this.countries[i].y += Fy
                 }
             }
-        }
-        // },100)
-
-        const game = root.appendChild(document.createElement('div'))
-        const menuTitle = game.appendChild(document.createElement('div'))
-        const log = game.appendChild(document.createElement('div'))
-        log.id = 'log'
-        log.style.height = '40%'
-        log.style.overflow = 'auto'
-        menuTitle.innerHTML = '<h1>WAR</h1>'
-        game.style.width = '50%'
-        game.style.backgroundColor = 'black'
-        game.style.textAlign = 'center'
-        game.style.color = 'white'
+            this.drawSvg(svg, this.countries, this.adjacencyList)
+        }, 10)
     }
 }
+
 
 const game = new Game(alphabeticNames, adjacencyList)
 game.draw()
